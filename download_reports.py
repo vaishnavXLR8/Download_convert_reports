@@ -8,9 +8,11 @@ from typing import List, Dict, Tuple
 import requests
 from requests import Response
 from dotenv import load_dotenv
+import msal
 
 PBI_SCOPE = "https://analysis.windows.net/powerbi/api/.default"
 TOKEN_URL_TPL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+AUTHORITY_TPL = "https://login.microsoftonline.com/{tenant}"
 BASE_URL = "https://api.powerbi.com/v1.0/myorg"
 
 CHUNK_SIZE = 1024 * 1024  # 1 MiB
@@ -24,7 +26,28 @@ def env(var: str, required: bool = True) -> str:
     return val or ""
 
 
-def get_access_token() -> str:
+def get_access_token_user() -> str:
+    """Acquire an access token via interactive user login (device code flow)."""
+    tenant = os.getenv("AZURE_TENANT_ID", "organizations")
+    client_id = env("AZURE_CLIENT_ID")  # Public client app registration
+    authority = AUTHORITY_TPL.format(tenant=tenant)
+
+    app = msal.PublicClientApplication(client_id=client_id, authority=authority)
+    # Note: For PublicClient, use delegated scopes; here we reuse the resource/.default pattern supported by MSAL
+    scopes = ["https://analysis.windows.net/powerbi/api/.default"]
+    flow = app.initiate_device_flow(scopes=scopes)
+    if "user_code" not in flow:
+        raise RuntimeError(f"Failed to start device flow: {flow}")
+    # Show message to the user to authenticate
+    print(flow.get("message"))
+    result = app.acquire_token_by_device_flow(flow)
+    if not result or "access_token" not in result:
+        raise RuntimeError(f"Auth failed: {result.get('error_description', result)}")
+    return result["access_token"]
+
+
+def get_access_token_spn() -> str:
+    """Acquire an access token with service principal (client credentials)."""
     tenant = env("AZURE_TENANT_ID")
     client_id = env("AZURE_CLIENT_ID")
     client_secret = env("AZURE_CLIENT_SECRET")
@@ -122,10 +145,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Download all PBIX reports from a Power BI workspace")
     parser.add_argument("--group-id", "-g", required=True, help="Power BI workspace (group) ID")
     parser.add_argument("--output", "-o", default="downloads", help="Output directory (default: ./downloads)")
+    parser.add_argument("--auth", choices=["user", "spn"], default="user",
+                        help="Authentication mode: user (interactive device code) or spn (service principal). Default: user")
     args = parser.parse_args()
 
     try:
-        token = get_access_token()
+        if args.auth == "user":
+            token = get_access_token_user()
+        else:
+            token = get_access_token_spn()
     except Exception as e:
         print(f"Auth error: {e}", file=sys.stderr)
         return 1
