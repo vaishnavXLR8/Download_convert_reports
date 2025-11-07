@@ -20,7 +20,9 @@ Function PBIXtoPBIP_PBITConversion
     [Parameter(Mandatory=$true)]
     [string] $PBIXFilePath,
     [Parameter(Mandatory=$true)]
-    [string] $ConversionFileType
+    [string] $ConversionFileType,
+    [Parameter(Mandatory=$false)]
+    [string] $OutputFolder = "C:\\Users\\VaishnavKamartiMAQSo\\Desktop\\VS code explorations\\DeDeuplication\\Download_convert_reports\\downloads\\pbip_files"
 
     )
 
@@ -149,8 +151,11 @@ Start-Sleep -Seconds 1
 [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
 Start-Sleep -Seconds 1
 
+# Ensure destination exists
+try { New-Item -ItemType Directory -Path $OutputFolder -Force | Out-Null } catch { }
+
 #Add path
-[System.Windows.Forms.SendKeys]::SendWait("C:\Users\VaishnavKamartiMAQSo\Desktop\VS code explorations\DeDeuplication\Download_convert_reports\downloads\pbip_files")
+[System.Windows.Forms.SendKeys]::SendWait($OutputFolder)
 #click enter to confirm path
 [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
 Start-Sleep -Seconds 1
@@ -182,8 +187,7 @@ Start-Sleep -Seconds 2
 
 Start-Sleep -Seconds 30
 Stop-Process -Name "PBIDesktop" # Close the Power BI Report
-
-
+Start-Sleep -Seconds 2
 
 } 
 

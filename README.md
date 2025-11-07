@@ -110,40 +110,51 @@ Provide either `-WorkspaceName` or `-WorkspaceId`.
 
 ---
 
-## PowerShell: GUI PBIX → PBIP/PBIT converter (test.psm1)
+## PowerShell: Console wrapper (run_exporter_console.ps1)
 
-Module providing `PBIXtoPBIP_PBITConversion` that opens a PBIX in Power BI Desktop and uses keyboard automation to Save As PBIP or PBIT.
+Interactive console script that:
+- Prompts for PBIX output folder, PBIP output folder, and Workspace Id
+- Runs `export_reports.ps1 -WorkspaceId <id> -OutputFolder <pbixFolder>`
+- Asks if you want to convert PBIX → PBIP using UI automation and processes each PBIX sequentially
 
-### Prerequisites
-- Windows PowerShell 5.1
-- Windows Power BI Desktop installed and associated with `.pbix` files
-- Keep your mouse/keyboard idle during automation; the script sends keystrokes to the active window
-
-### Import and usage
+### Usage
 ```powershell
-Import-Module ".\test.psm1" -Force
-
-# Convert to PBIP
-PBIXtoPBIP_PBITConversion -PBIXFilePath ".\downloads\MyReport.pbix" -ConversionFileType "PBIP"
-
-# Or convert to PBIT
-PBIXtoPBIP_PBITConversion -PBIXFilePath ".\downloads\MyReport.pbix" -ConversionFileType "PBIT"
+.\u005crun_exporter_console.ps1
 ```
 
-### Important notes
-- Output path is currently hardcoded in the module to:
-  `C:\Users\VaishnavKamartiMAQSo\Desktop\VS code explorations\DeDeuplication\Download_convert_reports\downloads\pbip_files`
-  - Edit this string in `test.psm1` to change the destination folder.
-- The script waits for the PBIDesktop window to appear, brings it to foreground, then performs File → Save As and selects PBIP/PBIT via keyboard.
-- If your UI language or Power BI Desktop layout differs significantly, the keystroke sequence might need adjustments.
+Follow the prompts. Answer `Y` to start the UI conversion. Keep the machine idle during conversion.
+
+### Build to .exe (optional)
+```powershell
+Install-Module PS2EXE -Scope CurrentUser
+Invoke-PS2EXE -InputFile .\run_exporter_console.ps1 -OutputFile .\ReportExportTool.exe -NoConsole:$false -STA
+```
+
+Notes:
+- `-STA` is recommended for SendKeys stability if you later embed UI automation.
+- The EXE still prompts interactively in the console.
+
+## PowerShell: Console wrapper module (run_exporter_console.psm1)
+
+Module alternative that exposes a function `Start-ReportExportConsole` with the same flow as the `.ps1` script.
+
+### Import and run
+```powershell
+Import-Module .\run_exporter_console.psm1 -Force
+Start-ReportExportConsole
+```
+
+### Behavior
+- Prompts for PBIX/PBIP folders and Workspace Id
+- Calls `export_reports.ps1` for export
+- Imports `PBIXtoPBIP_PBITConversion.psm1` and converts each PBIX one-by-one when you answer `Y`
+- Waits for each conversion to finish (PBIDesktop is closed by the function) before starting the next
+
+### Requirements
+- Windows PowerShell 5.1
+- Power BI Desktop installed and associated with `.pbix`
+- Power BI modules available (script will install if missing)
 
 ### Troubleshooting
-- Stuck on “report is still loading…”: the module now has a bounded wait. If your reports load slowly, increase the timeout inside the script.
-- Sign-in prompts: the script attempts to close the AAD broker process. If sign-in is required, sign in manually, then retry.
-- SendKeys not acting on Desktop: ensure Power BI Desktop is in the foreground; avoid interacting with other windows during the run.
-- Run in Windows PowerShell (5.1) rather than PowerShell 7 if SendKeys behaves inconsistently.
-
-### Roadmap (optional improvements)
-- Parameterize the destination path instead of a hardcoded string
-- Add option to batch-convert a folder of PBIX files
-- Use UI automation libraries for more robust element targeting
+- If export hangs on first run, the export script now installs NuGet/Trusts PSGallery and prints progress messages.
+- If UI conversion doesn’t act, ensure Power BI Desktop is foreground and don’t interact during runs.

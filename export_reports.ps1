@@ -1,24 +1,3 @@
-<#!
-Downloads all reports in a Power BI workspace to PBIX using Power BI PowerShell modules,
-identifies connection types, handles failures with clear errors, and optionally converts to PBIP
-using Power BI Desktop CLI. Tracks per-report and total durations.
-
-Prereqs:
-- Install-Module -Name MicrosoftPowerBIMgmt -Scope CurrentUser
-- Ensure you can sign in with Connect-PowerBIServiceAccount and have access to the workspace
-- For optional PBIP conversion: Power BI Desktop installed and PBIDesktop.exe path available
-
-Usage examples (PowerShell):
-  # By workspace name
-  .\export_reports.ps1 -WorkspaceName "My Workspace" -OutputFolder .\downloads
-
-  # By workspace id
-  .\export_reports.ps1 -WorkspaceId 00000000-0000-0000-0000-000000000000 -OutputFolder .\downloads
-
-  # With PBIP conversion
-  .\export_reports.ps1 -WorkspaceName "My Workspace" -OutputFolder .\downloads -ConvertToPBIP -PBIDesktopPath "C:\\Program Files\\Microsoft Power BI Desktop\\bin\\PBIDesktop.exe"
-!#>
-
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$false)]
@@ -36,11 +15,29 @@ param(
   [string]$PBIDesktopPath
 )
 
+function Ensure-PowerShellGetPrereqs {
+  try {
+    $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue
+    if (-not $nuget) {
+      Write-Host "Installing NuGet provider..." -ForegroundColor Yellow
+      Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+    }
+  } catch { Write-Host "Warning: Failed to install NuGet provider: $_" -ForegroundColor Yellow }
+
+  try {
+    $repo = Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue
+    if ($repo -and $repo.InstallationPolicy -ne 'Trusted') {
+      Write-Host "Trusting PSGallery repository..." -ForegroundColor Yellow
+      Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+    }
+  } catch { Write-Host "Warning: Failed to set PSGallery trust: $_" -ForegroundColor Yellow }
+}
+
 function Ensure-Module {
   param([string]$Name)
   if (-not (Get-Module -ListAvailable -Name $Name)) {
     Write-Host "Installing module: $Name" -ForegroundColor Yellow
-    Install-Module -Name $Name -Scope CurrentUser -Force -AllowClobber
+    Install-Module -Name $Name -Scope CurrentUser -Force -AllowClobber -Repository PSGallery -AcceptLicense
   }
   Import-Module $Name -ErrorAction Stop
 }
@@ -154,7 +151,7 @@ function Export-AllReports {
     $pbixPath = Join-Path -Path $OutFolder -ChildPath ($name + '.pbix')
     
 
-    Write-Host "[$i/$($reports.Count)] $($rep.Name) (Connection: $connType) - exporting..." -ForegroundColor White
+  Write-Host "[$i/$($reports.Count)] $($rep.Name) - exporting..." -ForegroundColor White
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $ok = $true
     $errMsg = $null
@@ -192,8 +189,7 @@ function Export-AllReports {
         $sizeBytes = [int64]$fi.Length
         $sizeMB = [Math]::Round($sizeBytes / 1MB, 2)
       }
-      Write-Host ("   Done. Size: {0} MB. Export: {1}ms{2}" -f $sizeMB, $exportMs, ($(if ($ConvertToPBIP) { ", Convert: $convMs`ms" } else { "" })))
-      if ($ConvertToPBIP) { Write-Host ", Convert: ${convMs}ms" } else { Write-Host "" }
+  Write-Host ("   Done. Size: {0} MB. Export: {1}ms{2}" -f $sizeMB, $exportMs, ($(if ($ConvertToPBIP) { ", Convert: $convMs`ms" } else { "" })))
       $results += [PSCustomObject]@{
         Name = $rep.Name
   SizeMB = $sizeMB
@@ -237,6 +233,8 @@ function Export-AllReports {
 }
 
 try {
+  Write-Host "Ensuring prerequisites..." -ForegroundColor DarkCyan
+  Ensure-PowerShellGetPrereqs
   Ensure-Module -Name MicrosoftPowerBIMgmt
   Ensure-Module -Name MicrosoftPowerBIMgmt.Reports
   Ensure-Module -Name MicrosoftPowerBIMgmt.Workspaces
@@ -247,6 +245,7 @@ catch {
 }
 
 try {
+  Write-Host "Connecting to Power BI (interactive)..." -ForegroundColor DarkCyan
   Connect-PowerBIServiceAccount -ErrorAction Stop | Out-Null
 }
 catch {
