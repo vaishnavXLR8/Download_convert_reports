@@ -3,8 +3,8 @@ Console wrapper for exporting PBIX reports and optional PBIP conversion.
 Prompts user for:
   1) Workspace Id
 Uses repo folders for outputs:
-  - PBIX:   .\downloads
-  - PBIP:   .\pbip_files
+  - PBIX:   .\download_pbix_files
+  - PBIP:   .\converted_pbip_files
 Runs export_reports.ps1 and optionally runs UI-automation conversion via PBIXtoPBIP_PBITConversion.psm1.
 
 Build to .exe (optional):
@@ -28,10 +28,11 @@ try {
   $ScriptRoot = $PSScriptRoot; if (-not $ScriptRoot) { $ScriptRoot = (Get-Location).Path }
 
   # Hardcoded repo-relative folders
-  $pbixFolder = Join-Path -Path $ScriptRoot -ChildPath 'downloads'
-  $pbipFolder = Join-Path -Path $ScriptRoot -ChildPath 'pbop_files'
+  $pbixFolder = Join-Path -Path $ScriptRoot -ChildPath 'download_pbix_files'
+  $pbipFolder = Join-Path -Path $ScriptRoot -ChildPath 'converted_pbip_files'
   New-Item -ItemType Directory -Path $pbixFolder -Force | Out-Null
   New-Item -ItemType Directory -Path $pbipFolder -Force | Out-Null
+  Write-Host "Where to find Workspace Id: In Power BI Service, open the workspace and look at the URL. It's the GUID after /groups/ e.g. https://app.powerbi.com/groups/<WorkspaceId>/..." -ForegroundColor DarkCyan
   $workspaceId = Read-NonEmpty "Enter Workspace Id (GUID)"
 
   # Normalize and ensure directories

@@ -128,9 +128,9 @@ function Export-AllReports {
   )
 
   $root = $PSScriptRoot; if (-not $root) { $root = (Get-Location).Path }
-  $outFolder = Join-Path -Path $root -ChildPath 'downloads'
+  $outFolder = Join-Path -Path $root -ChildPath 'download_pbix_files'
   New-Item -ItemType Directory -Path $outFolder -Force | Out-Null
-  $pbipRoot = Join-Path -Path $root -ChildPath 'pbip_files'
+  $pbipRoot = Join-Path -Path $root -ChildPath 'converted_pbip_files'
   if ($ConvertToPBIP) { New-Item -ItemType Directory -Path $pbipRoot -Force | Out-Null }
 
   $reports = Get-PowerBIReport -WorkspaceId $GroupId
@@ -144,7 +144,7 @@ function Export-AllReports {
   $totalSw = [System.Diagnostics.Stopwatch]::StartNew()
   $results = @()
 
-  Write-Host "Found $($reports.Count) report(s). Output: $((Resolve-Path $outFolder).Path)" -ForegroundColor Cyan
+  Write-Host "Found $($reports.Count) report(s). PBIX Output: $((Resolve-Path $outFolder).Path)" -ForegroundColor Cyan
 
   $i = 0
   foreach ($rep in $reports) {
@@ -191,13 +191,12 @@ function Export-AllReports {
         $sizeBytes = [int64]$fi.Length
         $sizeMB = [Math]::Round($sizeBytes / 1MB, 2)
       }
-  Write-Host ("   Done. Size: {0} MB. Export: {1}ms{2}" -f $sizeMB, $exportMs, ($(if ($ConvertToPBIP) { ", Convert: $convMs`ms" } else { "" })))
+      Write-Host ("   Done. Size: {0} MB. Export: {1}ms{2}" -f $sizeMB, $exportMs, ($(if ($ConvertToPBIP) { ", Convert: $convMs`ms" } else { "" })))
       $results += [PSCustomObject]@{
         Name = $rep.Name
   SizeMB = $sizeMB
   SizeBytes = $sizeBytes
         ExportMs = $exportMs
-        ConvertMs = $(if ($ConvertToPBIP) { $convMs } else { 0 })
         Status = "Success"
       }
     }
@@ -214,7 +213,6 @@ function Export-AllReports {
   SizeMB = 0
   SizeBytes = 0
         ExportMs = $exportMs
-        ConvertMs = $(if ($ConvertToPBIP) { $convMs } else { 0 })
         Status = "Failed"
         Error = $errMsg
       }
@@ -231,7 +229,7 @@ function Export-AllReports {
   Write-Host "Success: $succ" -ForegroundColor Green
   Write-Host "Failed : $fail" -ForegroundColor Red
   Write-Host "Total time: $($totalSw.Elapsed.ToString())" -ForegroundColor White
-  Write-Host ""; $results | Format-Table Name, SizeMB, ExportMs, ConvertMs, Status -AutoSize
+  Write-Host ""; $results | Format-Table Name, SizeMB, ExportMs, Status -AutoSize
 }
 
 try {
