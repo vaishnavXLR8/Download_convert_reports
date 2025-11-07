@@ -6,8 +6,9 @@ param(
   [Parameter(Mandatory=$false)]
   [string]$WorkspaceId,
 
-  [Parameter(Mandatory=$false)]
-  [string]$OutputFolder = ".\downloads",
+  #[Parameter(Mandatory=$false)]
+  # Removed OutputFolder parameter (hardcoded use of repo downloads folder)
+  [string]$WorkspaceDownloadsPlaceholder = "IGNORED",
 
   [switch]$ConvertToPBIP,
 
@@ -123,12 +124,13 @@ function Convert-ToPBIP {
 
 function Export-AllReports {
   param(
-    [Parameter(Mandatory=$true)][string]$GroupId,
-    [Parameter(Mandatory=$true)][string]$OutFolder
+    [Parameter(Mandatory=$true)][string]$GroupId
   )
 
-  New-Item -ItemType Directory -Path $OutFolder -Force | Out-Null
-  $pbipRoot = Join-Path -Path $OutFolder -ChildPath 'pbip_files'
+  $root = $PSScriptRoot; if (-not $root) { $root = (Get-Location).Path }
+  $outFolder = Join-Path -Path $root -ChildPath 'downloads'
+  New-Item -ItemType Directory -Path $outFolder -Force | Out-Null
+  $pbipRoot = Join-Path -Path $root -ChildPath 'pbip_files'
   if ($ConvertToPBIP) { New-Item -ItemType Directory -Path $pbipRoot -Force | Out-Null }
 
   $reports = Get-PowerBIReport -WorkspaceId $GroupId
@@ -142,13 +144,13 @@ function Export-AllReports {
   $totalSw = [System.Diagnostics.Stopwatch]::StartNew()
   $results = @()
 
-  Write-Host "Found $($reports.Count) report(s). Output: $((Resolve-Path $OutFolder).Path)" -ForegroundColor Cyan
+  Write-Host "Found $($reports.Count) report(s). Output: $((Resolve-Path $outFolder).Path)" -ForegroundColor Cyan
 
   $i = 0
   foreach ($rep in $reports) {
     $i++
     $name = Sanitize-FileName $rep.Name
-    $pbixPath = Join-Path -Path $OutFolder -ChildPath ($name + '.pbix')
+  $pbixPath = Join-Path -Path $outFolder -ChildPath ($name + '.pbix')
     
 
   Write-Host "[$i/$($reports.Count)] $($rep.Name) - exporting..." -ForegroundColor White
@@ -241,7 +243,7 @@ try {
 }
 catch {
   Write-Host "Failed to install/import Power BI modules: $_" -ForegroundColor Red
-  exit 1
+  throw
 }
 
 try {
@@ -250,12 +252,12 @@ try {
 }
 catch {
   Write-Host "Failed to connect to Power BI. $_" -ForegroundColor Red
-  exit 1
+  throw
 }
 
 if (-not $WorkspaceId -and -not $WorkspaceName) {
   Write-Host "Please provide -WorkspaceName or -WorkspaceId" -ForegroundColor Yellow
-  exit 1
+  throw "Missing workspace identifier. Provide -WorkspaceName or -WorkspaceId."
 }
 
 $ws = $null
@@ -269,7 +271,7 @@ elseif ($WorkspaceName) {
 
 if (-not $ws) {
   Write-Host "Workspace not found." -ForegroundColor Red
-  exit 1
+  throw "Workspace not found."
 }
 
 Write-Host "Workspace: $($ws.Name) [$($ws.Id)]" -ForegroundColor Cyan
@@ -278,4 +280,4 @@ if ($ConvertToPBIP -and -not $PBIDesktopPath) {
   Write-Host "-ConvertToPBIP specified but -PBIDesktopPath is missing." -ForegroundColor Yellow
 }
 
-Export-AllReports -GroupId $ws.Id -OutFolder $OutputFolder
+Export-AllReports -GroupId $ws.Id

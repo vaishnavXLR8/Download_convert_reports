@@ -28,6 +28,10 @@ Function PBIXtoPBIP_PBITConversion
 
 $ConversionFileTypeUpper =$ConversionFileType.ToUpper()
 
+# Hardcode destination folder to repo .\pbip_files regardless of input
+$moduleRoot = $PSScriptRoot; if (-not $moduleRoot) { $moduleRoot = (Get-Location).Path }
+$OutputFolder = Join-Path -Path $moduleRoot -ChildPath 'pbip_files'
+
 if (($ConversionFileTypeUpper -eq "PBIP") -or ($ConversionFileTypeUpper -eq "PBIT"))
 {
 }
